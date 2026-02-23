@@ -52,6 +52,7 @@ INSTALLED_APPS = [
 
     'rest_framework',
     'corsheaders',
+    'drf_spectacular',
 ]
 
 MIDDLEWARE = [
@@ -135,6 +136,7 @@ STATIC_URL = 'static/'
 
 # Django REST framework authentication configuration
 REST_FRAMEWORK = {
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',  # enables JWT auth
     )
@@ -148,3 +150,11 @@ SIMPLE_JWT = {
 }
 
 AUTH_USER_MODEL = 'auth_api.User'
+
+# Swagger documentation metadata
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'SprintLog API',         
+    'DESCRIPTION': 'Scrum & Call Report Management API',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+}
