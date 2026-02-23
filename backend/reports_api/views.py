@@ -2,6 +2,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated              
 from rest_framework.response import Response                        
 from rest_framework import status                                   
+from rest_framework.generics import ListAPIView
 
 from .models import Report                                          
 from .serializers import ReportSerializer                           
@@ -30,16 +31,27 @@ def create_report(request):
 # LIST ALL REPORTS OF CURRENT USER
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
-def list_reports(request):
+class ReportListView(ListAPIView):
     """
-    Get all reports created by logged-in user.
-    Ordered by newest first.
+    Returns paginated list of user's reports.
+    Supports search, filtering and ordering.
     """
 
-    reports = Report.objects.filter(user=request.user).order_by("-created_at")
+    serializer_class = ReportSerializer
+    permission_classes = [IsAuthenticated]
 
-    serializer = ReportSerializer(reports, many=True)
-    return Response(serializer.data)
+    # fields that support filtering
+    filterset_fields = ["report_type", "report_date"]
+
+    # fields that support search
+    search_fields = ["title", "content"]
+
+    # fields that support ordering
+    ordering_fields = ["created_at", "report_date"]
+
+    def get_queryset(self):
+        # return only logged-in user's reports
+        return Report.objects.filter(user=self.request.user).order_by("-created_at")
 
 
 
