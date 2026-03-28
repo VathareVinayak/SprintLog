@@ -1,5 +1,6 @@
 from datetime import datetime
 
+from django.http import HttpResponse
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.generics import ListAPIView
 from rest_framework.permissions import IsAuthenticated
@@ -8,6 +9,7 @@ from rest_framework import status
 
 from .models import Report
 from .serializers import ReportSerializer
+from .services import ai_service, pdf_service, report_service
 from .services.analytics_service import (
     get_dashboard_data,
     get_heatmap_data,
@@ -15,6 +17,11 @@ from .services.analytics_service import (
     get_report_distribution,
     get_timeline_data,
     get_weekly_activity,
+)
+from .services.exceptions import (
+    InvalidDateRangeError,
+    NoReportsFoundError,
+    PdfGenerationError,
 )
 
 
@@ -217,3 +224,44 @@ def heatmap(request):
         end_date=end_date,
     )
     return Response(data)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def generate_pdf_report(request):
+    try:
+        start_date, end_date = report_service.parse_date_range(
+            request.GET.get("start_date"),
+            request.GET.get("end_date"),
+        )
+        reports = report_service.get_reports_for_date_range(
+            request.user,
+            start_date,
+            end_date,
+        )
+        grouped_reports, ai_payload = report_service.group_reports_for_pdf(reports)
+        summary_data = ai_service.generate_report_summary(
+            request.user,
+            start_date,
+            end_date,
+            ai_payload,
+        )
+        pdf_bytes = pdf_service.generate_pdf_report(
+            request.user,
+            start_date,
+            end_date,
+            grouped_reports,
+            summary_data,
+        )
+    except InvalidDateRangeError as exc:
+        return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+    except NoReportsFoundError as exc:
+        return Response({"error": str(exc)}, status=status.HTTP_404_NOT_FOUND)
+    except PdfGenerationError as exc:
+        return Response({"error": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    response = HttpResponse(pdf_bytes, content_type="application/pdf")
+    response["Content-Disposition"] = (
+        f'attachment; filename="sprintlog-report-{start_date.isoformat()}-to-{end_date.isoformat()}.pdf"'
+    )
+    return response

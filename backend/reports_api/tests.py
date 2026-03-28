@@ -1,4 +1,5 @@
 from datetime import timedelta
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.urls import reverse
@@ -154,7 +155,7 @@ class ReportAPITestCase(APITestCase):
         timeline_response = self.client.get(reverse("report-timeline"))
         self.assertEqual(timeline_response.status_code, status.HTTP_200_OK)
         self.assertEqual(timeline_response.data["total_days"], 4)
-        self.assertEqual(timeline_response.data["timeline"][0]["date"], today.isoformat())
+        self.assertEqual(timeline_response.data["timeline"][0]["date"], today)
 
         streak_response = self.client.get(reverse("productivity-streak"))
         self.assertEqual(streak_response.status_code, status.HTTP_200_OK)
@@ -202,8 +203,8 @@ class ReportAPITestCase(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["start_date"], start_date.isoformat())
-        self.assertEqual(response.data["end_date"], today.isoformat())
+        self.assertEqual(response.data["start_date"], start_date)
+        self.assertEqual(response.data["end_date"], today)
         self.assertEqual(len(response.data["heatmap"]), 3)
         self.assertEqual(response.data["heatmap"][1]["count"], 1)
 
@@ -212,3 +213,69 @@ class ReportAPITestCase(APITestCase):
             {"start_date": "2026-99-99"},
         )
         self.assertEqual(invalid_response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    @patch("reports_api.views.ai_service.generate_report_summary")
+    def test_generate_pdf_returns_downloadable_pdf(self, mock_generate_report_summary):
+        start_date = timezone.localdate() - timedelta(days=1)
+        end_date = timezone.localdate()
+
+        self._create_report(
+            ReportType.SCRUM,
+            start_date,
+            title="PDF Day One",
+            content="Implemented reporting services.",
+        )
+        self._create_report(
+            ReportType.TRACK_CALL,
+            end_date,
+            title="PDF Day Two",
+            content="Integrated AI and PDF generation.",
+        )
+
+        mock_generate_report_summary.return_value = {
+            "summary": "Completed backend work for PDF generation.",
+            "highlights": [
+                "Built report grouping.",
+                "Integrated AI summary generation.",
+            ],
+        }
+
+        response = self.client.get(
+            reverse("generate-report-pdf"),
+            {
+                "start_date": start_date.isoformat(),
+                "end_date": end_date.isoformat(),
+            },
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response["Content-Type"], "application/pdf")
+        self.assertIn("attachment;", response["Content-Disposition"])
+        self.assertTrue(response.content.startswith(b"%PDF"))
+
+    def test_generate_pdf_rejects_invalid_date_range(self):
+        response = self.client.get(
+            reverse("generate-report-pdf"),
+            {
+                "start_date": "2026-03-28",
+                "end_date": "2026-03-20",
+            },
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(response.data["error"], "start_date cannot be after end_date.")
+
+    def test_generate_pdf_returns_not_found_when_no_reports_exist(self):
+        response = self.client.get(
+            reverse("generate-report-pdf"),
+            {
+                "start_date": "2026-03-20",
+                "end_date": "2026-03-28",
+            },
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self.assertEqual(
+            response.data["error"],
+            "No reports found for the selected date range.",
+        )

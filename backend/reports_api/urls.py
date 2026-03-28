@@ -2,6 +2,7 @@ from django.urls import path
 from .views import (
     ReportListView,
     create_report,
+    generate_pdf_report,
     heatmap,
     reports_by_date,
     productivity_streak,
@@ -33,6 +34,7 @@ urlpatterns = [
     path("timeline/", timeline, name="report-timeline"),
     path("streak/", productivity_streak, name="productivity-streak"),
     path("heatmap/", heatmap, name="report-heatmap"),
+    path("generate-pdf/", generate_pdf_report, name="generate-report-pdf"),
 
     # update report
     path("update/<int:pk>/", update_report, name="update-report"),
