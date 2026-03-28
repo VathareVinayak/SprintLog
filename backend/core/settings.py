@@ -142,7 +142,7 @@ REST_FRAMEWORK = {
     'PAGE_SIZE': 5, 
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',  # enables JWT auth
-    )
+    ),
         'DEFAULT_FILTER_BACKENDS': [
         'django_filters.rest_framework.DjangoFilterBackend',
         'rest_framework.filters.SearchFilter',
