@@ -8,8 +8,7 @@ from rest_framework import status
 
 from .models import Report
 from .serializers import ReportSerializer
-
-from reports_api.services.analytics_service import (
+from .services.analytics_service import (
     get_dashboard_data,
     get_heatmap_data,
     get_productivity_streak,

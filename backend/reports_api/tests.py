@@ -154,13 +154,38 @@ class ReportAPITestCase(APITestCase):
         timeline_response = self.client.get(reverse("report-timeline"))
         self.assertEqual(timeline_response.status_code, status.HTTP_200_OK)
         self.assertEqual(timeline_response.data["total_days"], 4)
-        self.assertEqual(timeline_response.data["timeline"][0]["date"], today)
+        self.assertEqual(timeline_response.data["timeline"][0]["date"], today.isoformat())
 
         streak_response = self.client.get(reverse("productivity-streak"))
         self.assertEqual(streak_response.status_code, status.HTTP_200_OK)
         self.assertEqual(streak_response.data["current_streak"], 4)
         self.assertEqual(streak_response.data["longest_streak"], 4)
         self.assertTrue(streak_response.data["active_today"])
+
+    def test_dashboard_stats_returns_expected_keys(self):
+        today = timezone.localdate()
+        self._create_report(ReportType.SCRUM, today, title="Today Scrum")
+        self._create_report(
+            ReportType.TRACK_CALL,
+            today - timedelta(days=1),
+            title="Yesterday Track",
+        )
+
+        response = self.client.get(reverse("dashboard-stats"))
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(set(response.data.keys()), {
+            "total_reports",
+            "today_reports",
+            "this_week_reports",
+            "report_type_distribution",
+            "recent_reports",
+        })
+        self.assertIsInstance(response.data["total_reports"], int)
+        self.assertIsInstance(response.data["today_reports"], int)
+        self.assertIsInstance(response.data["this_week_reports"], int)
+        self.assertIsInstance(response.data["report_type_distribution"], dict)
+        self.assertIsInstance(response.data["recent_reports"], list)
 
     def test_heatmap_supports_custom_range_and_validation(self):
         today = timezone.localdate()
@@ -177,8 +202,8 @@ class ReportAPITestCase(APITestCase):
         )
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["start_date"], start_date)
-        self.assertEqual(response.data["end_date"], today)
+        self.assertEqual(response.data["start_date"], start_date.isoformat())
+        self.assertEqual(response.data["end_date"], today.isoformat())
         self.assertEqual(len(response.data["heatmap"]), 3)
         self.assertEqual(response.data["heatmap"][1]["count"], 1)
 

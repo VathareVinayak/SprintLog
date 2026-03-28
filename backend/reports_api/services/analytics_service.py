@@ -23,8 +23,8 @@ def get_dashboard_data(user):
     Collect dashboard analytics for a specific user.
     """
 
-    today = timezone.now().date()
-    week_start = today - timedelta(days=7)
+    today = timezone.localdate()
+    week_start = today - timedelta(days=6)
 
     # total reports
     total_reports = Report.objects.filter(user=user).count()
@@ -38,7 +38,7 @@ def get_dashboard_data(user):
     # weekly reports
     weekly_reports = Report.objects.filter(
         user=user,
-        report_date__gte=week_start
+        report_date__range=(week_start, today),
     ).count()
 
     # report type distribution
@@ -115,10 +115,11 @@ def get_report_distribution(user):
         .annotate(count=Count("id"))
         .order_by("report_type")
     )
+    rows = list(distribution)
 
     return {
-        "total_reports": sum(item["count"] for item in distribution),
-        "distribution": list(distribution),
+        "total_reports": sum(item["count"] for item in rows),
+        "distribution": rows,
     }
 
 
