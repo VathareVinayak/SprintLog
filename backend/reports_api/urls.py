@@ -1,12 +1,42 @@
 from django.urls import path
-from .views import create_report, list_reports, reports_by_date , update_report, delete_report
+from .views import (
+    ReportListView,
+    create_report,
+    heatmap,
+    reports_by_date,
+    productivity_streak,
+    report_distribution,
+    timeline,
+    update_report,
+    delete_report,
+    dashboard_stats,
+    weekly_activity,
+)
+
 
 urlpatterns = [
-    path("create/", create_report),
-    path("by-date/", reports_by_date),
-    path("create/", create_report),
+    # create report
+    path("create/", create_report, name="create-report"),
+
+    # list reports with pagination/search/filter
     path("list/", ReportListView.as_view(), name="list-reports"),
-    path("by-date/", reports_by_date),
-    path("update/<int:pk>/", update_report),
-    path("delete/<int:pk>/", delete_report),
+
+    # filter reports by date
+    path("by-date/", reports_by_date, name="reports-by-date"),
+
+    # dashboard analytics
+    path("dashboard/", dashboard_stats, name="dashboard-stats"),
+
+    # advanced analytics
+    path("weekly/", weekly_activity, name="weekly-activity"),
+    path("distribution/", report_distribution, name="report-distribution"),
+    path("timeline/", timeline, name="report-timeline"),
+    path("streak/", productivity_streak, name="productivity-streak"),
+    path("heatmap/", heatmap, name="report-heatmap"),
+
+    # update report
+    path("update/<int:pk>/", update_report, name="update-report"),
+
+    # delete report
+    path("delete/<int:pk>/", delete_report, name="delete-report"),
 ]

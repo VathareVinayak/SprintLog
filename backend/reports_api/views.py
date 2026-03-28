@@ -1,11 +1,32 @@
-from rest_framework.decorators import api_view, permission_classes  
-from rest_framework.permissions import IsAuthenticated              
-from rest_framework.response import Response                        
-from rest_framework import status                                   
-from rest_framework.generics import ListAPIView
+from datetime import datetime
 
-from .models import Report                                          
-from .serializers import ReportSerializer                           
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.generics import ListAPIView
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework import status
+
+from .models import Report
+from .serializers import ReportSerializer
+from .services.analytics_service import (
+    get_dashboard_data,
+    get_heatmap_data,
+    get_productivity_streak,
+    get_report_distribution,
+    get_timeline_data,
+    get_weekly_activity,
+)
+
+
+def _parse_date(value, field_name):
+    if not value:
+        return None
+
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").date()
+    except ValueError:
+        raise ValueError(f"{field_name} must be in YYYY-MM-DD format.")
+
 
 
 # CREATE REPORT
@@ -17,7 +38,7 @@ def create_report(request):
     User is automatically assigned from JWT token.
     """
 
-    serializer = ReportSerializer(data=request.data)
+    serializer = ReportSerializer(data=request.data, context={"request": request})
 
     if serializer.is_valid():
         # attach logged-in user automatically (security)
@@ -29,8 +50,9 @@ def create_report(request):
 
 
 # LIST ALL REPORTS OF CURRENT USER
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
+# Note: class-based views shouldn't use @api_view decorator, which converts
+# the object to a function and breaks as_view(). Instead apply permissions
+# directly via attributes or mixins.
 class ReportListView(ListAPIView):
     """
     Returns paginated list of user's reports.
@@ -99,7 +121,12 @@ def update_report(request, pk):
             status=status.HTTP_404_NOT_FOUND
         )
 
-    serializer = ReportSerializer(report, data=request.data, partial=True)
+    serializer = ReportSerializer(
+        report,
+        data=request.data,
+        partial=True,
+        context={"request": request},
+    )
 
     if serializer.is_valid():
         serializer.save()
@@ -131,3 +158,62 @@ def delete_report(request, pk):
         {"message": "Report deleted successfully"},
         status=status.HTTP_200_OK
     )
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def dashboard_stats(request):
+    # Returns dashboard analytics for logged-in user.
+    data = get_dashboard_data(request.user)
+    return Response(data)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def weekly_activity(request):
+    data = get_weekly_activity(request.user)
+    return Response(data)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def report_distribution(request):
+    data = get_report_distribution(request.user)
+    return Response(data)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def timeline(request):
+    data = get_timeline_data(request.user)
+    return Response(data)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def productivity_streak(request):
+    data = get_productivity_streak(request.user)
+    return Response(data)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def heatmap(request):
+    try:
+        start_date = _parse_date(request.GET.get("start_date"), "start_date")
+        end_date = _parse_date(request.GET.get("end_date"), "end_date")
+    except ValueError as exc:
+        return Response({"error": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+    if start_date and end_date and start_date > end_date:
+        return Response(
+            {"error": "start_date cannot be after end_date."},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    data = get_heatmap_data(
+        request.user,
+        start_date=start_date,
+        end_date=end_date,
+    )
+    return Response(data)
